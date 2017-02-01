@@ -573,7 +573,9 @@ static ssize_t rmidev_read(struct file *filp, char __user *buf,
 
 	address = (unsigned short)(*f_pos);
 
-	rmidev_allocate_buffer(count);
+	retval = rmidev_allocate_buffer(count);
+	if (retval != 0)
+		goto clean_up;
 
 	mutex_lock(&(dev_data->file_mutex));
 
@@ -642,7 +644,9 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 	if (count > (REG_ADDR_LIMIT - *f_pos))
 		count = REG_ADDR_LIMIT - *f_pos;
 
-	rmidev_allocate_buffer(count);
+	retval = rmidev_allocate_buffer(count);
+	if (retval != 0)
+		goto unlock;
 
 	if (copy_from_user(rmidev->tmpbuf, buf, count))
 		return -EFAULT;
