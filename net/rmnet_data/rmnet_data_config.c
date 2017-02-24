@@ -1118,6 +1118,7 @@ static void rmnet_force_unassociate_device(struct net_device *dev)
 {
 	int i, j;
 	struct net_device *vndev;
+	struct rmnet_phys_ep_conf_s *config;
 	struct rmnet_logical_ep_conf_s *cfg;
 	struct rmnet_free_vnd_work *vnd_work;
 	ASSERT_RTNL();
@@ -1171,6 +1172,16 @@ static void rmnet_force_unassociate_device(struct net_device *dev)
 		schedule_work(&vnd_work->work);
 	} else {
 		kfree(vnd_work);
+	}
+
+	config = _rmnet_get_phys_ep_config(dev);
+
+	if (config) {
+		cfg = &config->local_ep;
+
+		if (cfg && cfg->refcount)
+			rmnet_unset_logical_endpoint_config
+			(cfg->egress_dev, RMNET_LOCAL_LOGICAL_ENDPOINT);
 	}
 
 	/* Clear the mappings on the phys ep */
