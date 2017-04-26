@@ -565,19 +565,25 @@ static ssize_t rmidev_read(struct file *filp, char __user *buf,
 		return -EBADF;
 	}
 
-	if (count == 0)
-		return 0;
+	mutex_lock(&(dev_data->file_mutex));
+
+	if (*f_pos > REG_ADDR_LIMIT) {
+		retval = -EFAULT;
+		goto clean_up;
+	}
 
 	if (count > (REG_ADDR_LIMIT - *f_pos))
 		count = REG_ADDR_LIMIT - *f_pos;
 
+	if (count == 0) {
+		retval = 0;
+		goto clean_up;
+	}
 	address = (unsigned short)(*f_pos);
 
 	retval = rmidev_allocate_buffer(count);
 	if (retval != 0)
 		goto clean_up;
-
-	mutex_lock(&(dev_data->file_mutex));
 
 	retval = synaptics_rmi4_reg_read(rmidev->rmi4_data,
 			*f_pos,
@@ -638,21 +644,27 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 		return -EBADF;
 	}
 
-	if (count == 0)
-		return 0;
+	mutex_lock(&(dev_data->file_mutex));
 
+	if (*f_pos > REG_ADDR_LIMIT) {
+		retval = -EFAULT;
+		goto unlock;
+	}
 	if (count > (REG_ADDR_LIMIT - *f_pos))
 		count = REG_ADDR_LIMIT - *f_pos;
+	if (count == 0) {
+		retval = 0;
+		goto unlock;
+	}
 
 	retval = rmidev_allocate_buffer(count);
 	if (retval != 0)
 		goto unlock;
 
-	if (copy_from_user(rmidev->tmpbuf, buf, count))
-		return -EFAULT;
-
-	mutex_lock(&(dev_data->file_mutex));
-
+	if (copy_from_user(rmidev->tmpbuf, buf, count)) {
+		retval = -EFAULT;
+		goto unlock;
+	}
 	retval = synaptics_rmi4_reg_write(rmidev->rmi4_data,
 			*f_pos,
 			rmidev->tmpbuf,
@@ -660,8 +672,8 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 	if (retval >= 0)
 		*f_pos += retval;
 
+unlock:
 	mutex_unlock(&(dev_data->file_mutex));
-
 	return retval;
 }
 
@@ -1058,3 +1070,4 @@ module_exit(rmidev_module_exit);
 MODULE_AUTHOR("Synaptics, Inc.");
 MODULE_DESCRIPTION("Synaptics DSX RMI Dev Module");
 MODULE_LICENSE("GPL v2");
+
